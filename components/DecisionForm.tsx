@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Situation } from "@/data/recipes";
+import { trackEvent } from "@/lib/analytics";
 
 type DecisionFormProps = {
   onSubmit: (input: {
@@ -46,12 +47,20 @@ export function DecisionForm({ onSubmit }: DecisionFormProps) {
   const [situation, setSituation] = useState<Situation>("tired");
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
+  const startedRef = useRef(false);
+
+  function markStarted() {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    trackEvent("decision_started");
+  }
 
   function addIngredients(items: string[]) {
     setIngredients((current) => uniqueIngredients([...current, ...items]));
   }
 
   function togglePill(label: string) {
+    markStarted();
     setIngredients((current) => {
       const exists = current.some(
         (item) => item.toLowerCase() === label.toLowerCase()
@@ -75,6 +84,11 @@ export function DecisionForm({ onSubmit }: DecisionFormProps) {
   function submit(event: React.FormEvent) {
     event.preventDefault();
     const fromDraft = parseIngredients(draft);
+    markStarted();
+    trackEvent("recommendations_requested", {
+      time: time === 45 ? "45+" : time,
+      situation
+    });
     onSubmit({
       time,
       situation,
@@ -92,7 +106,10 @@ export function DecisionForm({ onSubmit }: DecisionFormProps) {
               key={value}
               type="button"
               className={`choice-button ${time === value ? "selected" : ""}`}
-              onClick={() => setTime(value)}
+              onClick={() => {
+                markStarted();
+                setTime(value);
+              }}
               aria-pressed={time === value}
             >
               <strong>{value === 45 ? "45+" : value}</strong>
@@ -112,7 +129,10 @@ export function DecisionForm({ onSubmit }: DecisionFormProps) {
               className={`choice-button situation-button ${
                 situation === item.value ? "selected" : ""
               }`}
-              onClick={() => setSituation(item.value)}
+              onClick={() => {
+                markStarted();
+                setSituation(item.value);
+              }}
               aria-pressed={situation === item.value}
             >
               <span className="choice-icon" aria-hidden="true">{item.icon}</span>
@@ -148,7 +168,10 @@ export function DecisionForm({ onSubmit }: DecisionFormProps) {
         <input
           id="ingredients"
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            markStarted();
+            setDraft(event.target.value);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();

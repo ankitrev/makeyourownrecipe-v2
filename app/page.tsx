@@ -5,6 +5,7 @@ import { DecisionForm } from "@/components/DecisionForm";
 import { RecipeDrawer } from "@/components/RecipeDrawer";
 import { Results } from "@/components/Results";
 import { recipes, type Recipe } from "@/data/recipes";
+import { trackEvent } from "@/lib/analytics";
 import {
   filterRecipes,
   pickNextThree,
@@ -108,7 +109,19 @@ export default function Home() {
           <Results
             recipes={results}
             cookingId={cookingId}
-            onOpen={setOpenRecipe}
+            onOpen={(recipe) => {
+              trackEvent("recipe_selected", {
+                recipeId: recipe.id,
+                recipeName: recipe.title,
+                time: lastInput
+                  ? lastInput.time === 45
+                    ? "45+"
+                    : lastInput.time
+                  : undefined,
+                situation: lastInput?.situation
+              });
+              setOpenRecipe(recipe);
+            }}
             onMore={handleMore}
             onChangeAnswers={handleChangeAnswers}
           />
@@ -123,12 +136,30 @@ export default function Home() {
           savedFeedback={feedbackById[openRecipe.id] ?? null}
           onClose={() => setOpenRecipe(null)}
           onCookTonight={handleCookTonight}
-          onFeedback={(recipeId, feedback) =>
+          onFeedback={(recipeId, feedback) => {
+            const eventName =
+              feedback === "loved"
+                ? "feedback_loved"
+                : feedback === "good"
+                  ? "feedback_good"
+                  : "feedback_never_again";
+
+            trackEvent(eventName, {
+              recipeId,
+              recipeName: openRecipe.title,
+              time: lastInput
+                ? lastInput.time === 45
+                  ? "45+"
+                  : lastInput.time
+                : undefined,
+              situation: lastInput?.situation
+            });
+
             setFeedbackById((current) => ({
               ...current,
               [recipeId]: feedback
-            }))
-          }
+            }));
+          }}
         />
       )}
 
